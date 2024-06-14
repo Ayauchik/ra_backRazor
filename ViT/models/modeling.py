@@ -404,6 +404,6 @@ CONFIGS = {
     'ViT-L_32': configs.get_l32_config(),
     'ViT-H_14': configs.get_h14_config(),
     'R50-ViT-B_16': configs.get_r50_b16_config(),
-    'ViT-Ti-16': configs.get_ti16_config(),
+    'ViT-Ti_16': configs.get_ti16_config(),
     'testing': configs.get_testing(),
 }

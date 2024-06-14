@@ -9,6 +9,8 @@ from datetime import timedelta
 
 import torch
 import torch.distributed as dist
+from  torch.cuda.amp import autocast
+# from torch.nn.utils.prune import l1_unstructured, ln_structured
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -156,6 +158,12 @@ def train(args, model, train_loader, val_loader, test_loader, log, writer):
                 loss = nn.CrossEntropyLoss()(pred, y)
             else:
                 loss = model(x, y)
+            # with autocast(device_type="cuda"): 
+            #     if "resnet" in args.model_type:
+            #         pred = model(x)
+            #         loss = nn.CrossEntropyLoss()(pred, y)
+            #     else:
+            #         loss = model(x, y)
 
             if args.gradient_accumulation_steps > 1:
                 loss = loss / args.gradient_accumulation_steps
@@ -179,6 +187,9 @@ def train(args, model, train_loader, val_loader, test_loader, log, writer):
                 optimizer.zero_grad()
                 global_step += 1
 
+                # for layer in model.module.transformer.encoder.layer:
+                #   l1_unstructured(layer.ffn.fc1, "weight", 0.1)
+                #   l1_unstructured(layer.ffn.fc2, "weight", 0.1)
                 if global_step % 50 == 0:
                     log.info("Training ({}/{} Steps)\t(loss={:2.5f})\tData time={:.2f}({:.2f})\tBatch time={:.2f}({:.2f})\tMemory={:.1f}({:.1f})".format(
                         global_step, t_total, losses.val, data_time.val, data_time.avg, batch_time.val, batch_time.avg, memory_meter.val, memory_meter.avg))
@@ -186,6 +197,14 @@ def train(args, model, train_loader, val_loader, test_loader, log, writer):
                     writer.add_scalar("train/loss", scalar_value=losses.val, global_step=global_step)
                     writer.add_scalar("train/lr", scalar_value=scheduler.get_lr()[0], global_step=global_step)
                 if global_step % args.eval_every == 0:
+                    # for layer in model.module.transformer.encoder.layer:
+                    #   l1_unstructured(layer.ffn.fc1, "weight", 0.05)
+                    #   l1_unstructured(layer.ffn.fc2, "weight", 0.05)
+                    # model2 = model
+                    # model2.half()
+                    # # accuracy = valid(args, model2, writer, val_loader, global_step, log)
+                    # with autocast():
+                    #     accuracy = valid(args, model2, writer, val_loader, global_step, log)
                     accuracy = valid(args, model, writer, val_loader, global_step, log)
                 if global_step % args.eval_every == 0 and args.local_rank in [-1, 0]:
                     save_model(args, model, log)
@@ -217,7 +236,7 @@ def main():
     parser.add_argument("--customSplit", default="", help="the downstream custom split.")
 
     parser.add_argument("--model_type", choices=["ViT-B_16", "ViT-B_32", "ViT-L_16",
-                                                 "ViT-L_32", "ViT-H_14", "R50-ViT-B_16"],
+                                                 "ViT-L_32", "ViT-H_14", "R50-ViT-B_16", "ViT-Ti/16"],
                         default="ViT-B_16",
                         help="Which variant to use.")
     parser.add_argument("--pretrained_dir", type=str, default="checkpoint/ViT-B_16.npz",
@@ -360,8 +379,10 @@ def main():
              format(args.dataset, len(train_loader.dataset), len(val_loader.dataset)))
     # Training
     # Prepare dataset
+    # model.half()
+    # train(args, model, train_loader, val_loader, test_loader, log, writer)
+    # torch.cuda.amp.autocast(True)
     train(args, model, train_loader, val_loader, test_loader, log, writer)
-
 
 if __name__ == "__main__":
     main()
